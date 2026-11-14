@@ -1,0 +1,75 @@
+name: Build Kernel for gauguin (PixelOS 17 + SukiSU-Ultra)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: 1. Checkout kernel source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: 2. Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y bc bison build-essential ccache cpio curl flex \
+            git libelf-dev libssl-dev lld llvm python2 python3 rsync unzip wget \
+            xz-utils zip zstd binutils-aarch64-linux-gnu binutils-arm-linux-gnueabi \
+            gcc-aarch64-linux-gnu gcc-arm-linux-gnueabi
+
+      - name: 3. Download AOSP Clang (r547379)
+        run: |
+          mkdir -p "$GITHUB_WORKSPACE/clang"
+          curl -fsSL "https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/main/clang-r547379.tar.gz" -o clang.tar.gz
+          tar -xzf clang.tar.gz -C "$GITHUB_WORKSPACE/clang"
+          rm -f clang.tar.gz
+          "$GITHUB_WORKSPACE/clang/bin/clang" --version
+
+      - name: 4. Integrate SukiSU-Ultra (builtin, no SUSFS)
+        run: |
+          curl -LSs "https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU-Ultra/builtin/kernel/setup.sh" | bash -s builtin
+          sed -i 's|#include <linux/static_call.h>|#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 10, 0)\n#include <linux/static_call.h>\n#endif|' KernelSU/kernel/kernel_includes.h
+
+      - name: 5. Build kernel Image and DTBs
+        run: |
+          export PATH="$GITHUB_WORKSPACE/clang/bin:$PATH"
+          export ARCH=arm64
+          export SUBARCH=arm64
+          MAKE_ARGS=(
+            O=out
+            ARCH=arm64
+            CC=clang
+            LLVM=1
+            LLVM_IAS=1
+            CLANG_TRIPLE=aarch64-linux-gnu-
+            CROSS_COMPILE=aarch64-linux-gnu-
+            CROSS_COMPILE_ARM32=arm-linux-gnueabi-
+          )
+          make "${MAKE_ARGS[@]}" vendor/lito-perf_defconfig vendor/xiaomi/gauguin.config
+          make -j$(nproc) "${MAKE_ARGS[@]}" Image dtbs
+
+      - name: 6. Package with AnyKernel3
+        run: |
+          git clone --depth=1 https://github.com/osm0sis/AnyKernel3.git AnyKernel3
+          cp out/arch/arm64/boot/Image AnyKernel3/
+          if ls out/arch/arm64/boot/dts/vendor/qcom/*.dtb 1>/dev/null 2>&1; then
+            cat out/arch/arm64/boot/dts/vendor/qcom/*.dtb > AnyKernel3/dtb
+          fi
+          cd AnyKernel3
+          sed -i 's/do.devicecheck=1/do.devicecheck=1/' anykernel.sh
+          sed -i 's/device.name1=.*/device.name1=gauguin/' anykernel.sh
+          sed -i 's/device.name2=.*/device.name2=gauguinpro/' anykernel.sh
+          sed -i 's/device.name3=.*/device.name3=gauguininpro/' anykernel.sh
+          sed -i 's/BLOCK=.*/BLOCK=auto;/' anykernel.sh
+          sed -i 's/IS_SLOT_DEVICE=.*/IS_SLOT_DEVICE=0;/' anykernel.sh
+          rm -rf .git README.md
+          zip -r9 "$GITHUB_WORKSPACE/gauguin-PixelOS17-SukiSU-Ultra.zip" ./*
+
+      - name: 7. Upload flashable zip artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: gauguin-PixelOS17-SukiSU-Ultra
+          path: ${{ github.workspace }}/gauguin-PixelOS17-SukiSU-Ultra.zip
