@@ -69,14 +69,6 @@ jobs:
           make -j$(nproc) "${MAKE_ARGS[@]}" Image dtbs
           ccache -s
 
-      - name: 5.5. Patch kernel Image with KPM (patch_linux)
-        run: |
-          cd out/arch/arm64/boot
-          curl -fsSL "https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU_patch/refs/heads/main/kpm/patch_linux" -o patch_linux
-          chmod +x patch_linux
-          ./patch_linux
-          mv -f oImage Image
-
       - name: 6. Package with AnyKernel3
         run: |
           git clone --depth=1 https://github.com/osm0sis/AnyKernel3.git AnyKernel3
