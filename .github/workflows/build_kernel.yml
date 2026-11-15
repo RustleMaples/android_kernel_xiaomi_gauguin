@@ -10,6 +10,8 @@ on:
 jobs:
   build:
     runs-on: ubuntu-22.04
+    permissions:
+      contents: write
     steps:
       - name: 1. Checkout kernel source
         uses: actions/checkout@v4
@@ -102,3 +104,13 @@ jobs:
         with:
           name: gauguin-PixelOS17-SukiSU-Ultra
           path: ${{ github.workspace }}/gauguin-PixelOS17-SukiSU-Ultra.zip
+
+      - name: 8. Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="build-${{ github.run_number }}-${GITHUB_SHA::7}"
+          gh release create "$TAG" "$GITHUB_WORKSPACE/gauguin-PixelOS17-SukiSU-Ultra.zip" \
+            --title "gauguin PixelOS17 SukiSU-Ultra ($TAG)" \
+            --notes "Commit: ${{ github.sha }} (with KPM kpimg 0xe00 embedded)" \
+            --latest
