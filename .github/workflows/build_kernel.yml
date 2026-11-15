@@ -69,6 +69,17 @@ jobs:
           make -j$(nproc) "${MAKE_ARGS[@]}" Image dtbs
           ccache -s
 
+      - name: 5.5. Embed KPM (kptools-linux + kpimg 0xe00)
+        run: |
+          curl -fsSL "https://github.com/SukiSU-Ultra/SukiSU_KernelPatch_patch/releases/download/0.14.0/kptools-linux" -o kptools-linux
+          curl -fsSL "https://github.com/SukiSU-Ultra/SukiSU_KernelPatch_patch/releases/download/0.14.0/kpimg" -o kpimg
+          chmod +x kptools-linux
+          ./kptools-linux -p -i out/arch/arm64/boot/Image -k kpimg -o out/arch/arm64/boot/oImage
+          ./kptools-linux -l -i out/arch/arm64/boot/oImage | tee kpm_verify.txt
+          grep -q "patched=true" kpm_verify.txt
+          grep -q "version=0xe00" kpm_verify.txt
+          mv -f out/arch/arm64/boot/oImage out/arch/arm64/boot/Image
+
       - name: 6. Package with AnyKernel3
         run: |
           git clone --depth=1 https://github.com/osm0sis/AnyKernel3.git AnyKernel3
