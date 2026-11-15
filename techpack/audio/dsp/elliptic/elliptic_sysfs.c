@@ -19,8 +19,8 @@ static int sysfs_create_group_failed;
 extern struct elliptic_system_configuration_parameters_cache
 	elliptic_system_configuration_cache;
 
-static ssize_t calibration_store(struct device *dev,
-	struct device_attribute *attr, const char *buf, size_t count) {
+static ssize_t calibration_store(struct kobject *dev,
+	struct kobj_attribute *attr, const char *buf, size_t count) {
 
 	ssize_t result;
 
@@ -42,8 +42,8 @@ static ssize_t calibration_store(struct device *dev,
 	return result;
 }
 
-static ssize_t calibration_v2_store(struct device *dev,
-	struct device_attribute *attr, const char *buf, size_t count) {
+static ssize_t calibration_v2_store(struct kobject *dev,
+	struct kobj_attribute *attr, const char *buf, size_t count) {
 
 	ssize_t result;
 
@@ -65,8 +65,8 @@ static ssize_t calibration_v2_store(struct device *dev,
 	return result;
 }
 
-static ssize_t diagnostics_store(struct device *dev,
-	struct device_attribute *attr, const char *buf, size_t count) {
+static ssize_t diagnostics_store(struct kobject *dev,
+	struct kobj_attribute *attr, const char *buf, size_t count) {
 
 	ssize_t result;
 
@@ -88,8 +88,8 @@ static ssize_t diagnostics_store(struct device *dev,
 	return result;
 }
 
-static ssize_t ml_store(struct device *dev,
-	struct device_attribute *attr, const char *buf, size_t count) {
+static ssize_t ml_store(struct kobject *dev,
+	struct kobj_attribute *attr, const char *buf, size_t count) {
 
 	ssize_t result;
 
@@ -111,8 +111,8 @@ static ssize_t ml_store(struct device *dev,
 	return result;
 }
 
-static ssize_t calibration_show_core(struct device *dev,
-	struct device_attribute *attr, char *buf, int pretty)
+static ssize_t calibration_show_core(struct kobject *dev,
+	struct kobj_attribute *attr, char *buf, int pretty)
 {
 	ssize_t result;
 	int length;
@@ -162,14 +162,14 @@ static ssize_t calibration_show_core(struct device *dev,
 	return result;
 }
 
-static ssize_t calibration_show(struct device *dev,
-	struct device_attribute *attr, char *buf)
+static ssize_t calibration_show(struct kobject *dev,
+	struct kobj_attribute *attr, char *buf)
 {
 	return calibration_show_core(dev, attr, buf, 0);
 }
 
-static ssize_t calibration_v2_show_core(struct device *dev,
-	struct device_attribute *attr, char *buf, int pretty)
+static ssize_t calibration_v2_show_core(struct kobject *dev,
+	struct kobj_attribute *attr, char *buf, int pretty)
 {
 	ssize_t result;
 	int length;
@@ -229,14 +229,14 @@ static ssize_t calibration_v2_show_core(struct device *dev,
 	return result;
 }
 
-static ssize_t calibration_v2_show(struct device *dev,
-	struct device_attribute *attr, char *buf)
+static ssize_t calibration_v2_show(struct kobject *dev,
+	struct kobj_attribute *attr, char *buf)
 {
 	return calibration_v2_show_core(dev, attr, buf, 0);
 }
 
-static ssize_t diagnostics_show_core(struct device *dev,
-	struct device_attribute *attr, char *buf, int pretty)
+static ssize_t diagnostics_show_core(struct kobject *dev,
+	struct kobj_attribute *attr, char *buf, int pretty)
 {
 	ssize_t result;
 	int length;
@@ -281,14 +281,14 @@ static ssize_t diagnostics_show_core(struct device *dev,
 	return result;
 }
 
-static ssize_t diagnostics_show(struct device *dev,
-	struct device_attribute *attr, char *buf)
+static ssize_t diagnostics_show(struct kobject *dev,
+	struct kobj_attribute *attr, char *buf)
 {
 	return diagnostics_show_core(dev, attr, buf, 0);
 }
 
-static ssize_t ml_show_core(struct device *dev,
-	struct device_attribute *attr, char *buf, int pretty)
+static ssize_t ml_show_core(struct kobject *dev,
+	struct kobj_attribute *attr, char *buf, int pretty)
 {
 	ssize_t result;
 	int length;
@@ -343,15 +343,15 @@ static ssize_t ml_show_core(struct device *dev,
 	return result;
 }
 
-static ssize_t ml_show(struct device *dev,
-	struct device_attribute *attr, char *buf)
+static ssize_t ml_show(struct kobject *dev,
+	struct kobj_attribute *attr, char *buf)
 {
 	return ml_show_core(dev, attr, buf, 0);
 }
 
 
-static ssize_t version_show_core(struct device *dev,
-	struct device_attribute *attr, char *buf, int pretty)
+static ssize_t version_show_core(struct kobject *dev,
+	struct kobj_attribute *attr, char *buf, int pretty)
 {
 	ssize_t result;
 	struct elliptic_engine_version_info *version_info;
@@ -397,15 +397,15 @@ static ssize_t version_show_core(struct device *dev,
 	return result;
 }
 
-static ssize_t version_show(struct device *dev,
-	struct device_attribute *attr, char *buf)
+static ssize_t version_show(struct kobject *dev,
+	struct kobj_attribute *attr, char *buf)
 {
 	return version_show_core(dev, attr, buf, 0);
 }
 
 
-static ssize_t branch_show_core(struct device *dev,
-	struct device_attribute *attr, char *buf, int pretty)
+static ssize_t branch_show_core(struct kobject *dev,
+	struct kobj_attribute *attr, char *buf, int pretty)
 {
 	int length;
 
@@ -432,14 +432,14 @@ static ssize_t branch_show_core(struct device *dev,
 	return (ssize_t)length;
 }
 
-static ssize_t branch_show(struct device *dev,
-	struct device_attribute *attr, char *buf)
+static ssize_t branch_show(struct kobject *dev,
+	struct kobj_attribute *attr, char *buf)
 {
 	return branch_show_core(dev, attr, buf, 0);
 }
 
-static ssize_t tag_show_core(struct device *dev,
-	struct device_attribute *attr, char *buf, int pretty)
+static ssize_t tag_show_core(struct kobject *dev,
+	struct kobj_attribute *attr, char *buf, int pretty)
 {
 	int length;
 
@@ -466,8 +466,8 @@ static ssize_t tag_show_core(struct device *dev,
 	return (ssize_t)length;
 }
 
-static ssize_t tag_show(struct device *dev,
-	struct device_attribute *attr, char *buf)
+static ssize_t tag_show(struct kobject *dev,
+	struct kobj_attribute *attr, char *buf)
 {
 	return tag_show_core(dev, attr, buf, 0);
 }
@@ -500,10 +500,10 @@ static ssize_t cache_show(char *buf, int pretty)
 	return (ssize_t)length;
 }
 
-static ssize_t opmode_show(struct device *dev,
-	struct device_attribute *attr, char *buf)
+static ssize_t opmode_show(struct kobject *dev,
+	struct kobj_attribute *attr, char *buf)
 {
-	int length;
+	int length = 0;
 	ssize_t result;
 
 	struct elliptic_system_configuration_parameters_cache *cache =
@@ -515,10 +515,10 @@ static ssize_t opmode_show(struct device *dev,
 	return result;
 }
 
-static ssize_t opmode_flags_show(struct device *dev,
-	struct device_attribute *attr, char *buf)
+static ssize_t opmode_flags_show(struct kobject *dev,
+	struct kobj_attribute *attr, char *buf)
 {
-	int length;
+	int length = 0;
 	ssize_t result;
 	struct elliptic_system_configuration_parameters_cache *cache =
 				&elliptic_system_configuration_cache;
@@ -539,8 +539,8 @@ static ssize_t driver_version_show(char *buf)
 	return (ssize_t)length;
 }
 
-static ssize_t state_show(struct device *dev,
-	struct device_attribute *attr, char *buf)
+static ssize_t state_show(struct kobject *dev,
+	struct kobj_attribute *attr, char *buf)
 {
 	int length = 0;
 
@@ -572,16 +572,16 @@ static ssize_t state_show(struct device *dev,
 	return (ssize_t)length;
 }
 
-static struct device_attribute calibration_attr = __ATTR_RW(calibration);
-static struct device_attribute version_attr = __ATTR_RO(version);
-static struct device_attribute branch_attr = __ATTR_RO(branch);
-static struct device_attribute calibration_v2_attr = __ATTR_RW(calibration_v2);
-static struct device_attribute diagnostics_attr = __ATTR_RW(diagnostics);
-static struct device_attribute state_attr = __ATTR_RO(state);
-static struct device_attribute tag_attr = __ATTR_RO(tag);
-static struct device_attribute ml_attr = __ATTR_RW(ml);
-static struct device_attribute opmode_attr = __ATTR_RO(opmode);
-static struct device_attribute opmode_flags_attr = __ATTR_RO(opmode_flags);
+static struct kobj_attribute calibration_attr = __ATTR_RW(calibration);
+static struct kobj_attribute version_attr = __ATTR_RO(version);
+static struct kobj_attribute branch_attr = __ATTR_RO(branch);
+static struct kobj_attribute calibration_v2_attr = __ATTR_RW(calibration_v2);
+static struct kobj_attribute diagnostics_attr = __ATTR_RW(diagnostics);
+static struct kobj_attribute state_attr = __ATTR_RO(state);
+static struct kobj_attribute tag_attr = __ATTR_RO(tag);
+static struct kobj_attribute ml_attr = __ATTR_RW(ml);
+static struct kobj_attribute opmode_attr = __ATTR_RO(opmode);
+static struct kobj_attribute opmode_flags_attr = __ATTR_RO(opmode_flags);
 
 static struct attribute *elliptic_attrs[] = {
 	&calibration_attr.attr,
