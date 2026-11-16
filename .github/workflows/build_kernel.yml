@@ -6,6 +6,7 @@ on:
     branches:
       - seventeen
       - seventeen-sukisu
+      - hyperos4-sukisu
 
 jobs:
   build:
