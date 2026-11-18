@@ -1,4 +1,4 @@
-name: Build Kernel for gauguin (PixelOS 17 + SukiSU-Ultra)
+name: Build Kernel for gauguin (HyperOS4 + EROFS + TWRP Kernel)
 
 on:
   workflow_dispatch:
@@ -83,6 +83,26 @@ jobs:
           grep -q "version=0xe00" kpm_verify.txt
           mv -f out/arch/arm64/boot/oImage out/arch/arm64/boot/Image
 
+      - name: 5.8. Build clean EROFS Image for TWRP (no KSU, no KPM)
+        run: |
+          export PATH="$GITHUB_WORKSPACE/clang/bin:$PATH"
+          export ARCH=arm64
+          export SUBARCH=arm64
+          MAKE_ARGS=(
+            O=out
+            ARCH=arm64
+            CC="ccache clang"
+            LLVM=1
+            LLVM_IAS=1
+            CLANG_TRIPLE=aarch64-linux-gnu-
+            CROSS_COMPILE=aarch64-linux-gnu-
+            CROSS_COMPILE_ARM32=arm-linux-gnueabi-
+          )
+          ./scripts/config --file out/.config --disable CONFIG_KSU --disable CONFIG_KPM
+          make "${MAKE_ARGS[@]}" olddefconfig
+          make -j$(nproc) "${MAKE_ARGS[@]}" Image
+          cp out/arch/arm64/boot/Image "$GITHUB_WORKSPACE/Image-twrp"
+
       - name: 6. Package with AnyKernel3
         run: |
           git clone --depth=1 https://github.com/osm0sis/AnyKernel3.git AnyKernel3
@@ -100,18 +120,24 @@ jobs:
           rm -rf .git README.md
           zip -r9 "$GITHUB_WORKSPACE/gauguin-PixelOS17-SukiSU-Ultra.zip" ./*
 
-      - name: 7. Upload flashable zip artifact
+      - name: 7. Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: gauguin-PixelOS17-SukiSU-Ultra
-          path: ${{ github.workspace }}/gauguin-PixelOS17-SukiSU-Ultra.zip
+          path: |
+            ${{ github.workspace }}/gauguin-PixelOS17-SukiSU-Ultra.zip
+            ${{ github.workspace }}/Image-twrp
 
-      - name: 8. Publish GitHub Release
+      - name: 8. Publish GitHub Release & TWRP Clean Kernel
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           TAG="build-${{ github.run_number }}-${GITHUB_SHA::7}"
-          gh release create "$TAG" "$GITHUB_WORKSPACE/gauguin-PixelOS17-SukiSU-Ultra.zip" \
-            --title "gauguin PixelOS17 SukiSU-Ultra ($TAG)" \
-            --notes "Commit: ${{ github.sha }} (with KPM kpimg 0xe00 embedded)" \
-            --latest
+          gh release create "$TAG" "$GITHUB_WORKSPACE/gauguin-PixelOS17-SukiSU-Ultra.zip" "$GITHUB_WORKSPACE/Image-twrp" \
+            --title "gauguin HyperOS4/EROFS ($TAG)" \
+            --notes "Commit: ${{ github.sha }} (with KPM kpimg 0xe00 + clean Image-twrp)"
+          gh release delete twrp-kernel-erofs -y || true
+          git push origin :refs/tags/twrp-kernel-erofs || true
+          gh release create twrp-kernel-erofs "$GITHUB_WORKSPACE/Image-twrp" \
+            --title "Clean EROFS Kernel Image for TWRP" \
+            --notes "Built from ${{ github.sha }} (CONFIG_KSU=n, CONFIG_KPM=n, CONFIG_EROFS_FS=y)"
