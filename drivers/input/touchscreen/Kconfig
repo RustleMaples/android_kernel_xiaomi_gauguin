@@ -11,6 +11,7 @@ menuconfig INPUT_TOUCHSCREEN
 
 if INPUT_TOUCHSCREEN
 
+source "drivers/input/touchscreen/xiaomi/Kconfig"
 source "drivers/input/touchscreen/nt36672c/Kconfig"
 
 config TOUCHSCREEN_PROPERTIES
@@ -1357,6 +1358,13 @@ source "drivers/input/touchscreen/synaptics_tcm/Kconfig"
 source "drivers/input/touchscreen/focaltech_touch/Kconfig"
 
 source "drivers/input/touchscreen/nt36xxx/Kconfig"
+
+config SPI_XIAOMI_TP
+	bool "Xiaomi SPI touch panel transfer driver"
+	depends on SPI
+	default y if TOUCHSCREEN_NT36xxx_HOSTDL_SPI
+	help
+	  Say Y if you want to use Xiaomi SPI touch panel transfer driver.
 
 config TOUCHSCREEN_COMMON
 	bool "Common touchscreen interface to interact with userspace"

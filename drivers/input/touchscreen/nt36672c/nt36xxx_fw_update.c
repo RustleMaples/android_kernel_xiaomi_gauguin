@@ -299,28 +299,6 @@ static void update_firmware_release(void)
 	fw_entry = NULL;
 }
 
-int touch_fw_override = 0;
-char *touch_fw_name = "novatek_nt36672c_j17_fw01.bin";
-int panel_is_tianma = 0;
-
-static void update_firmware_override(int choice) {
-	if (panel_is_tianma) {
-		switch (choice) {
-			case 1:  touch_fw_name = "novatek_nt36672c_j17_fw01.bin"; break;
-			case 3:  touch_fw_name = "novatek_nt36672c_j17_mp01.bin"; break;
-			default: touch_fw_name = "novatek_nt36672c_j17_fw01.bin"; break;
-		}
-		NVT_LOG("tianma: override");
-	} else {
-		switch (choice) {
-			case 2:  touch_fw_name = "novatek_nt36672c_j17_fw02.bin"; break;
-			case 4:  touch_fw_name = "novatek_nt36672c_j17_mp02.bin"; break;
-			default: touch_fw_name = "novatek_nt36672c_j17_fw02.bin"; break;
-		}
-		NVT_LOG("huaxing: override");
-	}
-}
-
 /*******************************************************
 Description:
 	Novatek touchscreen request update firmware function.
@@ -332,11 +310,6 @@ static int32_t update_firmware_request(const char *filename)
 {
 	uint8_t retry = 0;
 	int32_t ret = 0;
-
-	if (touch_fw_override) {
-		update_firmware_override(touch_fw_override);
-		filename = touch_fw_name;
-	}
 
 	if (NULL == filename) {
 		return -ENOENT;
@@ -1158,6 +1131,6 @@ void Boot_Update_Firmware(struct work_struct *work)
 	}
 	nvt_get_fw_info();
 	mutex_unlock(&ts->lock);
-	pm_relax(&ts->client->dev);
+	pm_relax(&ts->pdev->dev);
 }
 #endif /* BOOT_UPDATE_FIRMWARE */
