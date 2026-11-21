@@ -1,0 +1,5 @@
+config MI_METIS
+	bool "Xiaomi Metis compatibility driver"
+	default n
+	help
+	  Expose /dev/metis and /sys/module/metis/parameters/* for HyperOS userspace compatibility.

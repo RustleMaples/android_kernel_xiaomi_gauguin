@@ -1,0 +1,5 @@
+config MILLET
+	bool "Xiaomi Millet frozen framework"
+	default n
+	help
+	  Xiaomi Millet background process freezer and monitor framework.
