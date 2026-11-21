@@ -324,10 +324,17 @@ static int bd_cdev_get_max_brightness(struct thermal_cooling_device *cdev,
 					unsigned long *state)
 {
 	struct backlight_device *bd = (struct backlight_device *)cdev->devdata;
+	int ret = 0;
 
-	*state = bd->props.max_brightness;
+	if (bd->props.max_brightness > 255) {
+		pr_info("%s: Skip thermal statistics for big max_brightness(%d) to avoid panic\n",
+			__func__, bd->props.max_brightness);
+		ret = -1;
+	} else {
+		*state = bd->props.max_brightness;
+	}
 
-	return 0;
+	return ret;
 }
 
 static int bd_cdev_get_cur_brightness(struct thermal_cooling_device *cdev,
