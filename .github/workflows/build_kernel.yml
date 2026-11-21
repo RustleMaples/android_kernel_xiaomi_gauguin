@@ -67,6 +67,7 @@ jobs:
           export PATH="$GITHUB_WORKSPACE/clang/bin:$PATH"
           export ARCH=arm64
           export SUBARCH=arm64
+          export CCACHE_DIR="$HOME/.ccache"
           export CCACHE_COMPILERCHECK="string:aosp-clang-r547379"
           export CCACHE_BASEDIR="$GITHUB_WORKSPACE"
           export CCACHE_NOHASHDIR=true

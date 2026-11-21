@@ -1249,7 +1249,7 @@ SYSCALL_DEFINE1(newuname, struct new_utsname __user *, name)
 	up_read(&uts_sem);
 	if (!strncmp(current->comm, "bpfload", 7) ||
 	    !strncmp(current->comm, "netbpfload", 10))
-		strlcpy(tmp.release, "5.4.286", sizeof(tmp.release));
+		strlcpy(tmp.release, "5.10.240", sizeof(tmp.release));
 	if (copy_to_user(name, &tmp, sizeof(tmp)))
 		return -EFAULT;
 
@@ -1276,7 +1276,7 @@ SYSCALL_DEFINE1(uname, struct old_utsname __user *, name)
 	up_read(&uts_sem);
 	if (!strncmp(current->comm, "bpfload", 7) ||
 	    !strncmp(current->comm, "netbpfload", 10))
-		strlcpy(tmp.release, "5.4.286", sizeof(tmp.release));
+		strlcpy(tmp.release, "5.10.240", sizeof(tmp.release));
 	if (copy_to_user(name, &tmp, sizeof(tmp)))
 		return -EFAULT;
 
