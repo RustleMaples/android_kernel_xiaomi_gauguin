@@ -51,7 +51,8 @@ jobs:
           rm -f clang.tar.gz
 
       - name: 3.5. Verify Clang version
-        run: "$GITHUB_WORKSPACE/clang/bin/clang" --version
+        run: |
+          "$GITHUB_WORKSPACE/clang/bin/clang" --version
 
       - name: 4. Integrate SukiSU-Ultra (builtin, no SUSFS, with KPM)
         run: |
