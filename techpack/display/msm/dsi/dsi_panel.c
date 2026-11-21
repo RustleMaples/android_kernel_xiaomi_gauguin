@@ -467,6 +467,10 @@ static int dsi_panel_power_on(struct dsi_panel *panel)
 		goto error_disable_vregs;
 	}
 
+	/* If LP11_INIT is set, skip panel reset here */
+	if (panel->lp11_init)
+		goto exit;
+
 	rc = dsi_panel_reset(panel);
 	if (rc) {
 		DSI_ERR("[%s] failed to reset panel, rc=%d\n", panel->name, rc);
@@ -524,6 +528,12 @@ static int dsi_panel_power_off(struct dsi_panel *panel)
 	if (rc)
 		DSI_ERR("[%s] failed to enable vregs, rc=%d\n",
 				panel->name, rc);
+
+	/* Ensure the time interval between LCDB power off and on meets the specification. */
+	if (panel->post_off_msleep > 0) {
+		DSI_INFO("Sleep after power off: %d ms\n", panel->post_off_msleep);
+		msleep(panel->post_off_msleep);
+	}
 
 	return rc;
 }
@@ -3466,6 +3476,8 @@ struct dsi_panel *dsi_panel_get(struct device *parent,
 				"qcom,mdss-dsi-panel-physical-type", NULL);
 	if (panel_physical_type && !strcmp(panel_physical_type, "oled"))
 		panel->panel_type = DSI_DISPLAY_PANEL_TYPE_OLED;
+	utils->read_u32(utils->data, "mi,mdss-dsi-post-off-msleep",
+				&panel->post_off_msleep);
 	rc = dsi_panel_parse_host_config(panel);
 	if (rc) {
 		DSI_ERR("failed to parse host configuration, rc=%d\n",
@@ -4051,7 +4063,8 @@ int dsi_panel_get_host_cfg_for_mode(struct dsi_panel *panel,
 	config->video_timing.dsc_enabled = mode->priv_info->dsc_enabled;
 	config->video_timing.dsc = &mode->priv_info->dsc;
 
-	if (dyn_clk_caps->dyn_clk_support)
+	if (dyn_clk_caps->dyn_clk_support ||
+			(panel->dfps_caps.dfps_support && mode->timing.clk_rate_hz))
 		config->bit_clk_rate_hz_override = mode->timing.clk_rate_hz;
 	else
 		config->bit_clk_rate_hz_override = mode->priv_info->clk_rate_hz;
@@ -4071,10 +4084,6 @@ int dsi_panel_pre_prepare(struct dsi_panel *panel)
 	}
 
 	mutex_lock(&panel->panel_lock);
-
-	/* If LP11_INIT is set, panel will be powered up during prepare() */
-	if (panel->lp11_init)
-		goto error;
 
 	rc = dsi_panel_power_on(panel);
 	if (rc) {
@@ -4221,9 +4230,9 @@ int dsi_panel_prepare(struct dsi_panel *panel)
 	mutex_lock(&panel->panel_lock);
 
 	if (panel->lp11_init) {
-		rc = dsi_panel_power_on(panel);
+		rc = dsi_panel_reset(panel);
 		if (rc) {
-			DSI_ERR("[%s] panel power on failed, rc=%d\n",
+			DSI_ERR("[%s] failed to reset panel, rc=%d\n",
 			       panel->name, rc);
 			goto error;
 		}

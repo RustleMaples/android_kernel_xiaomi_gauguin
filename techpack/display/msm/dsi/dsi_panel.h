@@ -233,6 +233,7 @@ struct dsi_panel {
 
 	int panel_test_gpio;
 	int power_mode;
+	u32 post_off_msleep;
 	enum dsi_panel_physical_type panel_type;
 };
 

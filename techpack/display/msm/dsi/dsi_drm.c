@@ -364,7 +364,9 @@ static void dsi_bridge_mode_set(struct drm_bridge *bridge,
 	c_bridge->dsi_mode.timing.clk_rate_hz =
 		dsi_drm_find_bit_clk_rate(c_bridge->display, adjusted_mode);
 
-	DSI_DEBUG("clk_rate: %llu\n", c_bridge->dsi_mode.timing.clk_rate_hz);
+	DSI_INFO("clk_rate: %llu, vrefresh: %d\n",
+		c_bridge->dsi_mode.timing.clk_rate_hz,
+		c_bridge->dsi_mode.timing.refresh_rate);
 }
 
 static bool dsi_bridge_mode_fixup(struct drm_bridge *bridge,
@@ -907,6 +909,9 @@ int dsi_connector_get_modes(struct drm_connector *connector, void *data,
 		if (display->cmdline_timing != NO_OVERRIDE) {
 			/* get the preferred mode from dsi display mode */
 			if (modes[i].is_preferred)
+				m->type |= DRM_MODE_TYPE_PREFERRED;
+		} else if (display->panel && display->panel->dfps_caps.dfps_support) {
+			if (i == display->panel->dfps_caps.preferred_fps_idx)
 				m->type |= DRM_MODE_TYPE_PREFERRED;
 		} else if (i == 0) {
 			/* set the first mode in list as preferred */
