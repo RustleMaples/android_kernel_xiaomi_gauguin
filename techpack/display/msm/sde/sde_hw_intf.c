@@ -84,7 +84,7 @@
 #define INTF_TEAR_TEAR_DETECT_CTRL      0x2B8
 
 #define IDLE_FPS_HZ     50
-#define QSYNC_RANGE     10
+#define QSYNC_RANGE 10
 
 static struct sde_intf_cfg *_intf_offset(enum sde_intf intf,
 		struct sde_mdss_cfg *m,
@@ -137,12 +137,12 @@ static int sde_hw_intf_avr_setup(struct sde_hw_intf *ctx,
 	}
 
 	c = &ctx->hw;
-	if (IDLE_FPS_HZ == avr_params->default_fps)
+	if (IDLE_FPS_HZ == avr_params->default_fps) {
 		min_fps = avr_params->default_fps;
-	else if (avr_params->default_fps > QSYNC_RANGE)
+	}
+	else {
 		min_fps = avr_params->default_fps - QSYNC_RANGE;
-	else
-		min_fps = avr_params->min_fps;
+	}
 	default_fps = avr_params->default_fps;
 	diff_fps = default_fps - min_fps;
 	hsync_period = params->hsync_pulse_width +

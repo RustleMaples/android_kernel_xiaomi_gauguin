@@ -7,6 +7,7 @@
 #include <linux/of.h>
 #include <linux/of_gpio.h>
 #include <linux/err.h>
+#include <drm/drm_notifier_mi.h>
 
 #include "msm_drv.h"
 #include "sde_connector.h"
@@ -20,6 +21,7 @@
 #include "dsi_pwr.h"
 #include "sde_dbg.h"
 #include "dsi_parser.h"
+#include "xiaomi_frame_stat.h"
 
 #define to_dsi_display(x) container_of(x, struct dsi_display, host)
 #define INT_BASE_10 10
@@ -44,8 +46,6 @@ static const struct of_device_id dsi_display_dt_match[] = {
 	{.compatible = "qcom,dsi-display"},
 	{}
 };
-
-struct dsi_display *primary_display;
 
 static void dsi_display_mask_ctrl_error_interrupts(struct dsi_display *display,
 			u32 mask, bool enable)
@@ -208,6 +208,7 @@ int dsi_display_set_backlight(struct drm_connector *connector,
 
 	mutex_lock(&panel->panel_lock);
 	if (!dsi_panel_initialized(panel)) {
+		pr_err("[%s] --- panel not initialized, bl_lvl = %d\n", __func__, bl_lvl);
 		rc = -EINVAL;
 		goto error;
 	}
@@ -248,7 +249,7 @@ error:
 	return rc;
 }
 
-static int dsi_display_cmd_engine_enable(struct dsi_display *display)
+int dsi_display_cmd_engine_enable(struct dsi_display *display)
 {
 	int rc = 0;
 	int i;
@@ -292,7 +293,7 @@ done:
 	return rc;
 }
 
-static int dsi_display_cmd_engine_disable(struct dsi_display *display)
+int dsi_display_cmd_engine_disable(struct dsi_display *display)
 {
 	int rc = 0;
 	int i;
@@ -478,7 +479,7 @@ error:
 }
 
 /* Allocate memory for cmd dma tx buffer */
-static int dsi_host_alloc_cmd_tx_buffer(struct dsi_display *display)
+int dsi_host_alloc_cmd_tx_buffer(struct dsi_display *display)
 {
 	int rc = 0, cnt = 0;
 	struct dsi_display_ctrl *display_ctrl;
@@ -866,6 +867,23 @@ release_panel_lock:
 	return rc;
 }
 
+char oled_wp_str[20] = {0};
+
+static int __init
+oled_wp_setup(char* str)
+{
+	strlcpy(oled_wp_str, str, sizeof(oled_wp_str));
+	return 1;
+}
+__setup("androidboot.oled_wp=", oled_wp_setup);
+
+ssize_t wp_info_show(struct device *device,
+			struct device_attribute *attr,
+			char *buf)
+{
+	return snprintf(buf, PAGE_SIZE, "%s\n", oled_wp_str);
+}
+
 static int dsi_display_cmd_prepare(const char *cmd_buf, u32 cmd_buf_len,
 		struct dsi_cmd_desc *cmd, u8 *payload, u32 payload_len)
 {
@@ -1047,26 +1065,60 @@ int dsi_display_set_power(struct drm_connector *connector,
 		int power_mode, void *disp)
 {
 	struct dsi_display *display = disp;
+	struct dsi_panel_mi_cfg *mi_cfg;
 	int rc = 0;
+	struct mi_drm_notifier notify_data;
+	const char *sde_power_mode_str[] = {
+		[SDE_MODE_DPMS_ON] = "SDE_MODE_DPMS_ON",
+		[SDE_MODE_DPMS_LP1] = "SDE_MODE_DPMS_LP1",
+		[SDE_MODE_DPMS_LP2] = "SDE_MODE_DPMS_LP2",
+		[SDE_MODE_DPMS_STANDBY] = "SDE_MODE_DPMS_STANDBY",
+		[SDE_MODE_DPMS_SUSPEND] = "SDE_MODE_DPMS_SUSPEND",
+		[SDE_MODE_DPMS_OFF] = "SDE_MODE_DPMS_OFF",
+	};
 
 	if (!display || !display->panel) {
 		DSI_ERR("invalid display/panel\n");
 		return -EINVAL;
 	}
 
+	mi_cfg = &display->panel->mi_cfg;
+
+	notify_data.data = &power_mode;
+	notify_data.id = MSM_DRM_PRIMARY_DISPLAY;
+
+	DSI_INFO("power_mode = %s\n", sde_power_mode_str[power_mode]);
+
 	switch (power_mode) {
 	case SDE_MODE_DPMS_LP1:
+		mi_cfg->in_aod = true;
+		mi_drm_notifier_call_chain(MI_DRM_EARLY_EVENT_BLANK, &notify_data);
 		rc = dsi_panel_set_lp1(display->panel);
+		if (mi_cfg->unset_doze_brightness)
+			dsi_panel_set_doze_brightness(display->panel,
+				mi_cfg->unset_doze_brightness, true);
+		mi_drm_notifier_call_chain(MI_DRM_EVENT_BLANK, &notify_data);
 		break;
 	case SDE_MODE_DPMS_LP2:
+		mi_cfg->in_aod = true;
+		mi_drm_notifier_call_chain(MI_DRM_EARLY_EVENT_BLANK, &notify_data);
 		rc = dsi_panel_set_lp2(display->panel);
+		if (mi_cfg->unset_doze_brightness)
+			dsi_panel_set_doze_brightness(display->panel,
+				mi_cfg->unset_doze_brightness, true);
+		mi_drm_notifier_call_chain(MI_DRM_EVENT_BLANK, &notify_data);
 		break;
 	case SDE_MODE_DPMS_ON:
+		mi_cfg->in_aod = false;
 		if ((display->panel->power_mode == SDE_MODE_DPMS_LP1) ||
-			(display->panel->power_mode == SDE_MODE_DPMS_LP2))
+			(display->panel->power_mode == SDE_MODE_DPMS_LP2)) {
+			mi_drm_notifier_call_chain(MI_DRM_EARLY_EVENT_BLANK, &notify_data);
 			rc = dsi_panel_set_nolp(display->panel);
+			mi_drm_notifier_call_chain(MI_DRM_EVENT_BLANK, &notify_data);
+		}
 		break;
 	case SDE_MODE_DPMS_OFF:
+		mi_cfg->in_aod = false;
 	default:
 		return rc;
 	}
@@ -5418,6 +5470,7 @@ int dsi_display_dev_probe(struct platform_device *pdev)
 	display->panel_node = panel_node;
 	display->pdev = pdev;
 	display->boot_disp = boot_disp;
+	display->is_prim_display = true;
 
 	dsi_display_parse_cmdline_topology(display, index);
 
@@ -5464,10 +5517,6 @@ int dsi_display_dev_remove(struct platform_device *pdev)
 	}
 
 	display = platform_get_drvdata(pdev);
-	if (!display || !display->panel_node) {
-		DSI_ERR("invalid display\n");
-		return -EINVAL;
-	}
 
 	/* decrement ref count */
 	of_node_put(display->panel_node);
@@ -6070,10 +6119,7 @@ int dsi_display_get_info(struct drm_connector *connector,
 	info->max_width = 1920;
 	info->max_height = 1080;
 	info->qsync_min_fps =
-		display->panel->qsync_caps.qsync_min_fps;
-	info->has_qsync_min_fps_list =
-		(display->panel->qsync_caps.qsync_min_fps_list_len > 0) ?
-		true : false;
+		display->panel->qsync_min_fps;
 
 	switch (display->panel->panel_mode) {
 	case DSI_OP_VIDEO_MODE:
@@ -6276,11 +6322,12 @@ int dsi_display_get_modes(struct dsi_display *display,
 	struct dsi_dfps_capabilities dfps_caps;
 	struct dsi_display_ctrl *ctrl;
 	struct dsi_host_common_cfg *host = &display->panel->host_config;
-	bool is_split_link, is_cmd_mode = false;
+	bool is_split_link, is_cmd_mode;
 	u32 num_dfps_rates, timing_mode_count, display_mode_count;
 	u32 sublinks_count, mode_idx, array_idx = 0;
 	struct dsi_dyn_clk_caps *dyn_clk_caps;
 	int i, start, end, rc = -EINVAL;
+	u32 num_of_lanes = 4, bpp = 24;
 
 	if (!display || !out_modes) {
 		DSI_ERR("Invalid params\n");
@@ -6413,7 +6460,6 @@ int dsi_display_get_modes(struct dsi_display *display,
 		 * else if dynamic clk switch is supported then update all
 		 * the bit clk rates.
 		 */
-
 		if (is_cmd_mode &&
 			(display->panel->panel_mode == DSI_OP_VIDEO_MODE))
 			continue;
@@ -6427,9 +6473,8 @@ int dsi_display_get_modes(struct dsi_display *display,
 
 	if (!is_cmd_mode &&
 			(dfps_caps.dec_vfp_list_len || dfps_caps.dec_hfp_list_len)) {
-		u32 num_of_lanes = 0, bpp = 0;
-
 		if (host) {
+			num_of_lanes = 0;
 			if (host->data_lanes & DSI_DATA_LANE_0)
 				num_of_lanes++;
 			if (host->data_lanes & DSI_DATA_LANE_1)
@@ -6442,37 +6487,35 @@ int dsi_display_get_modes(struct dsi_display *display,
 			bpp = host->bpp;
 		}
 
-		if (num_of_lanes) {
-			for (i = 0; i < array_idx; i++) {
-				struct dsi_display_mode *mode = &display->modes[i];
-				u64 h_period = DSI_H_TOTAL_DSC(&mode->timing);
-				u64 v_period = DSI_V_TOTAL(&mode->timing);
-				u32 clk_rate_hz = h_period * v_period *
-					mode->timing.refresh_rate * bpp / num_of_lanes;
+		for (i = 0; i < array_idx; i++) {
+			struct dsi_display_mode *mode =	&display->modes[i];
+			u64 h_period = DSI_H_TOTAL_DSC(&mode->timing);
+			u64 v_period = DSI_V_TOTAL(&mode->timing);
+			u32 clk_rate_hz = h_period * v_period *
+				mode->timing.refresh_rate * bpp / num_of_lanes;
 
-				if (i < dfps_caps.dec_vfp_list_len && dfps_caps.dec_vfp_list[i]) {
-					/* Keep clk_rate_hz constant */
-					if (!mode->timing.clk_rate_hz)
-						mode->timing.clk_rate_hz = clk_rate_hz;
-					/* Reduce v front porch to improve refresh rate */
-					mode->timing.v_front_porch -= dfps_caps.dec_vfp_list[i];
+			if (i < dfps_caps.dec_vfp_list_len && dfps_caps.dec_vfp_list[i]) {
+				/* Keep clk_rate_hz constant */
+				if (!mode->timing.clk_rate_hz) {
+					mode->timing.clk_rate_hz = clk_rate_hz;
 				}
+				/* Reduce v front porch to improve refresh rate */
+				mode->timing.v_front_porch -= dfps_caps.dec_vfp_list[i];
+			}
 
-				if (i < dfps_caps.dec_hfp_list_len && dfps_caps.dec_hfp_list[i]) {
-					/* Keep clk_rate_hz constant */
-					if (!mode->timing.clk_rate_hz)
-						mode->timing.clk_rate_hz = clk_rate_hz;
-					/* Reduce h front porch to improve refresh rate */
-					mode->timing.h_front_porch -= dfps_caps.dec_hfp_list[i];
+			if (i < dfps_caps.dec_hfp_list_len && dfps_caps.dec_hfp_list[i]) {
+				/* Keep clk_rate_hz constant */
+				if (!mode->timing.clk_rate_hz) {
+					mode->timing.clk_rate_hz = clk_rate_hz;
 				}
+				/* Reduce h front porch to improve refresh rate */
+				mode->timing.h_front_porch -= dfps_caps.dec_hfp_list[i];
 			}
 		}
 	}
-
 exit:
 	*out_modes = display->modes;
 	rc = 0;
-	primary_display = display;
 
 error:
 	if (rc)
@@ -6561,25 +6604,6 @@ int dsi_display_get_default_lms(void *dsi_display, u32 *num_lm)
 	mutex_unlock(&display->display_lock);
 
 	return rc;
-}
-
-int dsi_display_get_qsync_min_fps(void *display_dsi, u32 mode_fps)
-{
-	struct dsi_display *display = (struct dsi_display *)display_dsi;
-	struct dsi_panel *panel;
-	u32 i;
-
-	if (display == NULL || display->panel == NULL)
-		return -EINVAL;
-
-	panel = display->panel;
-	for (i = 0; i < panel->dfps_caps.dfps_list_len; i++) {
-		if (panel->dfps_caps.dfps_list[i] == mode_fps)
-			return panel->qsync_caps.qsync_min_fps_list[i];
-	}
-	SDE_EVT32(mode_fps);
-	DSI_DEBUG("Invalid mode_fps %d\n", mode_fps);
-	return -EINVAL;
 }
 
 int dsi_display_find_mode(struct dsi_display *display,
@@ -6834,6 +6858,8 @@ int dsi_display_set_mode(struct dsi_display *display,
 			timing.refresh_rate);
 
 	memcpy(display->panel->cur_mode, &adj_mode, sizeof(adj_mode));
+
+	frame_stat_reset();
 error:
 	mutex_unlock(&display->display_lock);
 	return rc;
@@ -7219,7 +7245,7 @@ int dsi_display_prepare(struct dsi_display *display)
 	if (mode->dsi_mode_flags & DSI_MODE_FLAG_DMS) {
 		if (display->is_cont_splash_enabled &&
 		    display->config.panel_mode == DSI_OP_VIDEO_MODE) {
-			DSI_ERR("DMS not supported on first frame\n");
+			DSI_ERR("DMS not supported on first frame, ignor\n");
 			rc = -EINVAL;
 			goto error;
 		}
@@ -7413,7 +7439,7 @@ static int dsi_display_qsync(struct dsi_display *display, bool enable)
 	int i;
 	int rc = 0;
 
-	if (!display->panel->qsync_caps.qsync_min_fps) {
+	if (!display->panel->qsync_min_fps) {
 		DSI_ERR("%s:ERROR: qsync set, but no fps\n", __func__);
 		return 0;
 	}
@@ -7441,7 +7467,7 @@ static int dsi_display_qsync(struct dsi_display *display, bool enable)
 	}
 
 exit:
-	SDE_EVT32(enable, display->panel->qsync_caps.qsync_min_fps, rc);
+	SDE_EVT32(enable, display->panel->qsync_min_fps, rc);
 	mutex_unlock(&display->display_lock);
 	return rc;
 }
@@ -7648,6 +7674,7 @@ int dsi_display_enable(struct dsi_display *display)
 		}
 
 		display->panel->panel_initialized = true;
+		display->panel->mi_cfg.panel_initialized = true;
 		DSI_DEBUG("cont splash enabled, display enable not required\n");
 		return 0;
 	}
@@ -7904,6 +7931,13 @@ int dsi_display_unprepare(struct dsi_display *display)
 			       display->name, rc);
 	}
 
+	if (!display->poms_pending) {
+		rc = dsi_panel_post_unprepare(display->panel);
+		if (rc)
+			DSI_ERR("[%s] panel post-unprepare failed, rc=%d\n",
+			       display->name, rc);
+	}
+
 	/* Remove additional vote added for pre_mode_switch_to_cmd */
 	if (display->poms_pending &&
 			display->config.panel_mode == DSI_OP_VIDEO_MODE) {
@@ -7953,13 +7987,6 @@ int dsi_display_unprepare(struct dsi_display *display)
 	/* destrory dsi isr set up */
 	dsi_display_ctrl_isr_configure(display, false);
 
-	if (!display->poms_pending) {
-		rc = dsi_panel_post_unprepare(display->panel);
-		if (rc)
-			DSI_ERR("[%s] panel post-unprepare failed, rc=%d\n",
-			       display->name, rc);
-	}
-
 	mutex_unlock(&display->display_lock);
 
 	/* Free up DSI ERROR event callback */
@@ -7967,10 +7994,6 @@ int dsi_display_unprepare(struct dsi_display *display)
 
 	SDE_EVT32(SDE_EVTLOG_FUNC_EXIT);
 	return rc;
-}
-
-struct dsi_display *get_main_display(void) {
-	return primary_display;
 }
 
 static int __init dsi_display_register(void)
