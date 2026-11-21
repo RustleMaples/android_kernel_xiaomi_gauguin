@@ -82,6 +82,7 @@ jobs:
           grep -q "patched=true" kpm_verify.txt
           grep -q "version=0xe00" kpm_verify.txt
           mv -f out/arch/arm64/boot/oImage out/arch/arm64/boot/Image
+          cp -f out/arch/arm64/boot/Image "$GITHUB_WORKSPACE/Image-sukisu"
 
       - name: 5.8. Build clean EROFS Image for TWRP (no KSU, no KPM)
         run: |
@@ -106,7 +107,7 @@ jobs:
       - name: 6. Package with AnyKernel3
         run: |
           git clone --depth=1 https://github.com/osm0sis/AnyKernel3.git AnyKernel3
-          cp out/arch/arm64/boot/Image AnyKernel3/
+          cp "$GITHUB_WORKSPACE/Image-sukisu" AnyKernel3/Image
           if ls out/arch/arm64/boot/dts/vendor/qcom/*.dtb 1>/dev/null 2>&1; then
             cat out/arch/arm64/boot/dts/vendor/qcom/*.dtb > AnyKernel3/dtb
           fi
