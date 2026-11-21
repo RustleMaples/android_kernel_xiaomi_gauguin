@@ -1555,6 +1555,62 @@ static int dsi_panel_parse_dfps_caps(struct dsi_panel *panel)
 	}
 	dfps_caps->dfps_support = true;
 
+	if (dfps_caps->dfps_support) {
+		rc = utils->count_u32_elems(utils->data,
+					  "mi,mdss-dsi-dfps-dec-vfp-list");
+		dfps_caps->dec_vfp_list_len = rc > 0 ? rc : 0;
+		if (dfps_caps->dec_vfp_list_len) {
+			dfps_caps->dec_vfp_list = kcalloc(dfps_caps->dec_vfp_list_len, sizeof(u32),
+					GFP_KERNEL);
+			if (!dfps_caps->dec_vfp_list) {
+				DSI_ERR("[%s] kcalloc decrease vfp list failed\n", name);
+				rc = -ENOMEM;
+				goto error;
+			}
+
+			rc = utils->read_u32_array(utils->data,
+					"mi,mdss-dsi-dfps-dec-vfp-list",
+					dfps_caps->dec_vfp_list,
+					dfps_caps->dec_vfp_list_len);
+			if (rc) {
+				DSI_ERR("[%s] decrease vfp list parse failed\n", name);
+				rc = -EINVAL;
+				goto error;
+			}
+		}
+
+		rc = utils->count_u32_elems(utils->data,
+					  "mi,mdss-dsi-dfps-dec-hfp-list");
+		dfps_caps->dec_hfp_list_len = rc > 0 ? rc : 0;
+		if (dfps_caps->dec_hfp_list_len) {
+			dfps_caps->dec_hfp_list = kcalloc(dfps_caps->dec_hfp_list_len, sizeof(u32),
+					GFP_KERNEL);
+			if (!dfps_caps->dec_hfp_list) {
+				DSI_ERR("[%s] kcalloc decrease hfp list failed\n", name);
+				rc = -ENOMEM;
+				goto error;
+			}
+
+			rc = utils->read_u32_array(utils->data,
+					"mi,mdss-dsi-dfps-dec-hfp-list",
+					dfps_caps->dec_hfp_list,
+					dfps_caps->dec_hfp_list_len);
+			if (rc) {
+				DSI_ERR("[%s] decrease hfp list parse failed\n", name);
+				rc = -EINVAL;
+				goto error;
+			}
+		}
+
+		rc = utils->read_u32(utils->data, "mi,mdss-dsi-dfps-preferred-fps-index",
+				&dfps_caps->preferred_fps_idx);
+		if (rc) {
+			DSI_DEBUG("[%s] failed to parse preferred fps index, use default value\n", name);
+			dfps_caps->preferred_fps_idx = 0;
+			rc = 0;
+		}
+	}
+
 	/* calculate max and min fps */
 	dfps_caps->max_refresh_rate = dfps_caps->dfps_list[0];
 	dfps_caps->min_refresh_rate = dfps_caps->dfps_list[0];
@@ -3267,6 +3323,11 @@ int dsi_panel_parse_esd_reg_read_configs(struct dsi_panel *panel)
 				esd_config->groups * status_len);
 	}
 
+	/* Ignore status value, read reg is only to trigger
+	 * esd err irq. (GAUGUIN-2131) */
+	esd_config->status_value_ignore = utils->read_bool(utils->data,
+		"mi,mdss-dsi-panel-status-value-ignore");
+
 	return 0;
 
 error4:
@@ -3337,6 +3398,9 @@ static int dsi_panel_parse_esd_config(struct dsi_panel *panel)
 	} else if (panel->esd_config.status_mode ==  ESD_MODE_PANEL_TE) {
 		esd_mode = "te_check";
 	}
+
+	utils->read_u32(utils->data, "mi,esd-check-interval",
+			&esd_config->esd_status_interval);
 
 	DSI_DEBUG("ESD enabled with mode: %s\n", esd_mode);
 

@@ -82,6 +82,11 @@ struct dsi_dfps_capabilities {
 	u32 *dfps_list;
 	u32 dfps_list_len;
 	bool dfps_support;
+	u32 *dec_vfp_list;
+	u32 *dec_hfp_list;
+	u32 dec_vfp_list_len;
+	u32 dec_hfp_list_len;
+	u32 preferred_fps_idx;
 };
 
 struct dsi_qsync_capabilities {
@@ -170,6 +175,8 @@ struct drm_panel_esd_config {
 	u8 *return_buf;
 	u8 *status_buf;
 	u32 groups;
+	bool status_value_ignore;
+	u32 esd_status_interval;
 };
 
 struct dsi_panel {

@@ -588,6 +588,10 @@ static int _sde_connector_update_bl_scale(struct sde_connector *c_conn)
 
 	bl_config = &dsi_display->panel->bl_config;
 
+	if (bl_config->type == DSI_BACKLIGHT_WLED &&
+		bl_config->bl_level == 0)
+		return 0;
+
 	if (!c_conn->allow_bl_update) {
 		c_conn->unset_bl_level = bl_config->bl_level;
 		return 0;
@@ -2218,16 +2222,21 @@ static void sde_connector_check_status_work(struct work_struct *work)
 	struct sde_connector *conn;
 	int rc = 0;
 	struct device *dev;
+	struct dsi_display *display;
+	struct drm_panel_esd_config *esd_cfg = NULL;
 
 	conn = container_of(to_delayed_work(work),
 			struct sde_connector, status_work);
-	if (!conn) {
+	if (!conn || !conn->display) {
 		SDE_ERROR("not able to get connector object\n");
 		return;
 	}
 
 	mutex_lock(&conn->lock);
 	dev = conn->base.dev->dev;
+	display = conn->display;
+	if (conn->connector_type == DRM_MODE_CONNECTOR_DSI && display->panel)
+		esd_cfg = &display->panel->esd_config;
 
 	if (!conn->ops.check_status || dev->power.is_suspended ||
 			(conn->dpms_mode != DRM_MODE_DPMS_ON)) {
@@ -2239,15 +2248,21 @@ static void sde_connector_check_status_work(struct work_struct *work)
 	rc = conn->ops.check_status(&conn->base, conn->display, false);
 	mutex_unlock(&conn->lock);
 
-	if (rc > 0) {
-		u32 interval;
+	if (rc > 0 || (esd_cfg && esd_cfg->status_value_ignore)) {
+		u32 interval = (esd_cfg && esd_cfg->esd_status_interval) ?
+			esd_cfg->esd_status_interval : STATUS_CHECK_INTERVAL_MS;
 
-		SDE_DEBUG("esd check status success conn_id: %d enc_id: %d\n",
+		if (rc > 0)
+			SDE_DEBUG("esd check status success conn_id: %d enc_id: %d\n",
+				conn->base.base.id, conn->encoder->base.id);
+		else
+			SDE_INFO("Ignore esd check status error conn_id: %d enc_id: %d\n",
 				conn->base.base.id, conn->encoder->base.id);
 
 		/* If debugfs property is not set then take default value */
-		interval = conn->esd_status_interval ?
-			conn->esd_status_interval : STATUS_CHECK_INTERVAL_MS;
+		if (conn->esd_status_interval)
+			interval = conn->esd_status_interval;
+
 		schedule_delayed_work(&conn->status_work,
 			msecs_to_jiffies(interval));
 		return;

@@ -6276,7 +6276,7 @@ int dsi_display_get_modes(struct dsi_display *display,
 	struct dsi_dfps_capabilities dfps_caps;
 	struct dsi_display_ctrl *ctrl;
 	struct dsi_host_common_cfg *host = &display->panel->host_config;
-	bool is_split_link, is_cmd_mode;
+	bool is_split_link, is_cmd_mode = false;
 	u32 num_dfps_rates, timing_mode_count, display_mode_count;
 	u32 sublinks_count, mode_idx, array_idx = 0;
 	struct dsi_dyn_clk_caps *dyn_clk_caps;
@@ -6422,6 +6422,50 @@ int dsi_display_get_modes(struct dsi_display *display,
 		if (is_preferred) {
 			/* Set first timing sub mode as preferred mode */
 			display->modes[start].is_preferred = true;
+		}
+	}
+
+	if (!is_cmd_mode &&
+			(dfps_caps.dec_vfp_list_len || dfps_caps.dec_hfp_list_len)) {
+		u32 num_of_lanes = 0, bpp = 0;
+
+		if (host) {
+			if (host->data_lanes & DSI_DATA_LANE_0)
+				num_of_lanes++;
+			if (host->data_lanes & DSI_DATA_LANE_1)
+				num_of_lanes++;
+			if (host->data_lanes & DSI_DATA_LANE_2)
+				num_of_lanes++;
+			if (host->data_lanes & DSI_DATA_LANE_3)
+				num_of_lanes++;
+
+			bpp = host->bpp;
+		}
+
+		if (num_of_lanes) {
+			for (i = 0; i < array_idx; i++) {
+				struct dsi_display_mode *mode = &display->modes[i];
+				u64 h_period = DSI_H_TOTAL_DSC(&mode->timing);
+				u64 v_period = DSI_V_TOTAL(&mode->timing);
+				u32 clk_rate_hz = h_period * v_period *
+					mode->timing.refresh_rate * bpp / num_of_lanes;
+
+				if (i < dfps_caps.dec_vfp_list_len && dfps_caps.dec_vfp_list[i]) {
+					/* Keep clk_rate_hz constant */
+					if (!mode->timing.clk_rate_hz)
+						mode->timing.clk_rate_hz = clk_rate_hz;
+					/* Reduce v front porch to improve refresh rate */
+					mode->timing.v_front_porch -= dfps_caps.dec_vfp_list[i];
+				}
+
+				if (i < dfps_caps.dec_hfp_list_len && dfps_caps.dec_hfp_list[i]) {
+					/* Keep clk_rate_hz constant */
+					if (!mode->timing.clk_rate_hz)
+						mode->timing.clk_rate_hz = clk_rate_hz;
+					/* Reduce h front porch to improve refresh rate */
+					mode->timing.h_front_porch -= dfps_caps.dec_hfp_list[i];
+				}
+			}
 		}
 	}
 
