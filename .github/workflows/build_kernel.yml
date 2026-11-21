@@ -30,17 +30,27 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.ccache
-          key: gauguin-4.19-ccache-${{ github.sha }}
+          key: gauguin-4.19-ccache-v2-${{ github.sha }}
           restore-keys: |
-            gauguin-4.19-ccache-
+            gauguin-4.19-ccache-v2-
+
+      - name: 2.8. Cache AOSP Clang (r547379)
+        id: cache-clang
+        uses: actions/cache@v4
+        with:
+          path: ${{ github.workspace }}/clang
+          key: aosp-clang-r547379-v1
 
       - name: 3. Download AOSP Clang (r547379)
+        if: steps.cache-clang.outputs.cache-hit != 'true'
         run: |
           mkdir -p "$GITHUB_WORKSPACE/clang"
           curl -fsSL "https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/main/clang-r547379.tar.gz" -o clang.tar.gz
           tar -xzf clang.tar.gz -C "$GITHUB_WORKSPACE/clang"
           rm -f clang.tar.gz
-          "$GITHUB_WORKSPACE/clang/bin/clang" --version
+
+      - name: 3.5. Verify Clang version
+        run: "$GITHUB_WORKSPACE/clang/bin/clang" --version
 
       - name: 4. Integrate SukiSU-Ultra (builtin, no SUSFS, with KPM)
         run: |
@@ -55,6 +65,10 @@ jobs:
           export PATH="$GITHUB_WORKSPACE/clang/bin:$PATH"
           export ARCH=arm64
           export SUBARCH=arm64
+          export CCACHE_COMPILERCHECK="string:aosp-clang-r547379"
+          export CCACHE_BASEDIR="$GITHUB_WORKSPACE"
+          export CCACHE_NOHASHDIR=true
+          export CCACHE_SLOPPINESS="time_macros,file_macro"
           ccache -M 5G
           ccache -z
           MAKE_ARGS=(
