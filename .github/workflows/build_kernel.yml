@@ -44,7 +44,7 @@ jobs:
 
       - name: 4. Integrate SukiSU-Ultra (builtin, no SUSFS, with KPM)
         run: |
-          curl -LSs "https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU-Ultra/builtin/kernel/setup.sh" | bash -s builtin
+          curl -LSs "https://raw.githubusercontent.com/SukiSU-Nova/SukiSU-Nova/builtin/kernel/setup.sh" | bash -s builtin
           sed -i 's|#include <linux/static_call.h>|#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 10, 0)\n#include <linux/static_call.h>\n#endif|' KernelSU/kernel/kernel_includes.h
           sed -i 's/access_ok(u64_to_user_ptr(cmd.result_code), sizeof(result))/access_ok(VERIFY_WRITE, u64_to_user_ptr(cmd.result_code), sizeof(result))/' KernelSU/kernel/extension/kpm/kpm.c
           sed -i 's/^#define KSU_NO_PREINIT$/#ifndef KSU_NO_PREINIT\n#define KSU_NO_PREINIT\n#endif/' KernelSU/kernel/preinit/common/preinit.h
